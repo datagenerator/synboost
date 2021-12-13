@@ -9,7 +9,7 @@ from util.load import load_ckp
 import sys
 sys.path.append("..")
 from image_dissimilarity.util import trainer_util
-from image_dissimilarity.models.dissimilarity_model import DissimNet, DissimNetPrior
+from image_dissimilarity.models.dissimilarity_model import DissimNet, DissimNetPrior, ResNetDissimNet
 
 class DissimilarityTrainer:
     """
