@@ -328,7 +328,7 @@ class DissimNetPrior(nn.Module):
 
 
 class ResNetDissimNet(nn.Module):
-    def __init__(self, architecture='resnet18', semantic=True, pretrained=True, correlation=True, spade='',
+    def __init__(self, architecture='resnet18', semantic=True, pretrained=True, correlation=True, prior = False, spade='',
                  num_semantic_classes = 19):
         super(ResNetDissimNet, self).__init__()
 
