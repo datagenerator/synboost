@@ -35,6 +35,8 @@ class DissimilarityTrainer:
             self.diss_model = DissimNetPrior(**config['model']).cuda(self.gpu)
         elif 'vgg' in config['model']['architecture']:
             self.diss_model = DissimNet(**config['model']).cuda(self.gpu)
+        elif 'resnet18' in config['model']['architecture']:
+            self.diss_model = ResNetDissimNet(**config['model']).cuda(self.gpu)
         else:
             raise NotImplementedError()
 
