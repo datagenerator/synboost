@@ -9,7 +9,7 @@ from util.load import load_ckp
 import sys
 sys.path.append("..")
 from image_dissimilarity.util import trainer_util
-from image_dissimilarity.models.dissimilarity_model import DissimNet, DissimNetPrior, ResNetDissimNet
+from image_dissimilarity.models.dissimilarity_model import DissimNet, DissimNetPrior, ResNetDissimNet, ResNetDissimNetPrior
 
 class DissimilarityTrainer:
     """
@@ -31,8 +31,10 @@ class DissimilarityTrainer:
         else:
             self.gpu = 'cpu'
         
-        if config['model']['prior']:
+        if 'vgg' in config['model']['architecture'] and config['model']['prior']:
             self.diss_model = DissimNetPrior(**config['model']).cuda(self.gpu)
+        elif 'resnet18' in config['model']['architecture'] and config['model']['prior']:
+            self.diss_model = ResNetDissimNetPrior(**config['model']).cuda(self.gpu)
         elif 'vgg' in config['model']['architecture']:
             self.diss_model = DissimNet(**config['model']).cuda(self.gpu)
         elif 'resnet18' in config['model']['architecture']:
