@@ -508,7 +508,7 @@ class ResNetDissimNetPrior(nn.Module):
         
         if self.semantic:
             self.semantic_encoder = ResNetSemanticEncoder()
-            self.prior_encoder = ResNetSemanticEncoder(architecture=architecture, in_channels=3, base_feature_size=64)
+            self.prior_encoder = ResNetSemanticEncoder(in_channels=3, base_feature_size=64)
         
         # layers for decoder
         # all the 3x3 convolutions
