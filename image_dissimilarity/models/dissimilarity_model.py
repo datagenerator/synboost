@@ -335,7 +335,8 @@ class ResNetDissimNet(nn.Module):
         # get initialization parameters
         self.correlation = correlation
         self.spade = spade
-        self.semantic = False if spade else semantic
+        #self.semantic = False if spade else semantic
+        self.semantic = semantic
         
         # generate encoders
         if self.spade == 'encoder' or self.spade == 'both':
@@ -496,7 +497,8 @@ class ResNetDissimNetPrior(nn.Module):
         # get initialization parameters
         self.correlation = correlation
         self.spade = spade
-        self.semantic = False if spade else semantic
+        #self.semantic = False if spade else semantic
+        self.semantic = semantic
         self.prior = prior
         
         # generate encoders
