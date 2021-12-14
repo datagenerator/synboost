@@ -491,7 +491,7 @@ class ResNetDissimNet(nn.Module):
 class ResNetDissimNetPrior(nn.Module):
     def __init__(self, architecture='resnet18', semantic=True, pretrained=True, correlation=True, prior = False, spade='',
                  num_semantic_classes = 19):
-        super(ResNetDissimNet, self).__init__()
+        super(ResNetDissimNetPrior, self).__init__()
 
         # get initialization parameters
         self.correlation = correlation
