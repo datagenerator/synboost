@@ -7,30 +7,27 @@ import torchvision.transforms as transforms
 from torchvision.transforms import ToPILImage
 import yaml
 import random
-from driving_uncertainty.options.config_class import Config
-
+import options.test_options
 import sys
-sys.path.insert(0, os.path.join(os.getcwd(), os.path.dirname(__file__), 'image_segmentation'))
+sys.path.insert(0, './image_segmentation')
 import network
 from optimizer import restore_snapshot
 from datasets import cityscapes
 from config import assert_and_infer_cfg
-sys.path.insert(0, os.path.join(os.getcwd(), os.path.dirname(__file__), 'image_synthesis'))
-from driving_uncertainty.image_synthesis.models.pix2pix_model import Pix2PixModel
-from driving_uncertainty.image_dissimilarity.models.dissimilarity_model import DissimNetPrior, DissimNet
-from driving_uncertainty.image_dissimilarity.models.vgg_features import VGG19_difference
-from driving_uncertainty.image_dissimilarity.data.cityscapes_dataset import one_hot_encoding
-
-
+from image_synthesis.models.pix2pix_model import Pix2PixModel
+from image_dissimilarity.models.dissimilarity_model import DissimNetPrior, DissimNet
+from image_dissimilarity.models.vgg_features import VGG19_difference
+from image_dissimilarity.data.cityscapes_dataset import one_hot_encoding
 class AnomalyDetector():
     def __init__(self, ours=True, seed=0):
         
         self.set_seeds(seed)
         
         # Common options for all models
-        TestOptions = Config()
-        self.opt = TestOptions
+        TestOptions = options.test_options.TestOptions()
+        self.opt = TestOptions.parse()
         torch.cuda.empty_cache()
+        
         self.get_segmentation()
         self.get_synthesis()
         self.get_dissimilarity(ours)
@@ -137,13 +134,11 @@ class AnomalyDetector():
         out = {'anomaly_score': torch.tensor(diss_pred), 'segmentation': torch.tensor(seg_final)}
         
         return out['anomaly_score']
-
     def set_seeds(self, seed=0):
         # set seeds for reproducibility
         torch.manual_seed(0)
         np.random.seed(0)
         random.seed(0)
-
     def get_segmentation(self):
         # Get Segmentation Net
         assert_and_infer_cfg(self.opt, train_mode=False)
@@ -151,8 +146,7 @@ class AnomalyDetector():
         net = network.get_net(self.opt, criterion=None)
         net = torch.nn.DataParallel(net).cuda()
         print('Segmentation Net Built.')
-        snapshot = os.path.join(os.getcwd(), os.path.dirname(__file__), self.opt.snapshot)
-        self.seg_net, _ = restore_snapshot(net, optimizer=None, snapshot=snapshot,
+        self.seg_net, _ = restore_snapshot(net, optimizer=None, snapshot=self.opt.snapshot,
                                            restore_optimizer_bool=False)
         self.seg_net.eval()
         print('Segmentation Net Restored.')
@@ -160,7 +154,6 @@ class AnomalyDetector():
     def get_synthesis(self):
         # Get Synthesis Net
         print('Synthesis Net Built.')
-        self.opt.checkpoints_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), self.opt.checkpoints_dir)
         self.syn_net = Pix2PixModel(self.opt)
         self.syn_net.eval()
         print('Synthesis Net Restored')
@@ -168,9 +161,9 @@ class AnomalyDetector():
     def get_dissimilarity(self, ours):
         # Get Dissimilarity Net
         if ours:
-            config_diss = os.path.join(os.getcwd(), os.path.dirname(__file__), 'image_dissimilarity/configs/test/ours_configuration.yaml')
+            config_diss = './image_dissimilarity/configs/test/ours_configuration.yaml'
         else:
-            config_diss = os.path.join(os.getcwd(), os.path.dirname(__file__), 'image_dissimilarity/configs/test/baseline_configuration.yaml')
+            config_diss = './image_dissimilarity/configs/test/baseline_configuration.yaml'
     
         with open(config_diss, 'r') as stream:
             config_diss = yaml.load(stream, Loader=yaml.FullLoader)
@@ -184,8 +177,7 @@ class AnomalyDetector():
             self.diss_model = DissimNet(**config_diss['model']).cuda()
     
         print('Dissimilarity Net Built.')
-        save_folder = os.path.join(os.getcwd(), os.path.dirname(__file__), config_diss['save_folder'])
-        model_path = os.path.join(save_folder,
+        model_path = os.path.join(config_diss['save_folder'],
                                   '%s_net_%s.pth' % (config_diss['which_epoch'], config_diss['experiment_name']))
         model_weights = torch.load(model_path)
         self.diss_model.load_state_dict(model_weights)
@@ -215,14 +207,16 @@ class AnomalyDetector():
     
 if __name__ == '__main__':
     import bdlb
-    
+    import tensorflow_datasets as tfds
     # define fishyscapes test parameters
+    detector = AnomalyDetector(True)
+    cs = tfds.load("cityscapes")
     fs = bdlb.load(benchmark="fishyscapes")
     # automatically downloads the dataset
-    data = fs.get_dataset('Static')
-    detector = AnomalyDetector(True)
+    data = fs.get_dataset('LostAndFound')
+    metrics = fs.evaluate(detector.estimator, data)
     metrics = fs.evaluate(detector.estimator_worker, data)
-    
+
     print('My method achieved {:.2f}% AP'.format(100 * metrics['AP']))
     print('My method achieved {:.2f}% FPR@95TPR'.format(100 * metrics['FPR@95%TPR']))
     print('My method achieved {:.2f}% auroc'.format(100 * metrics['auroc']))
