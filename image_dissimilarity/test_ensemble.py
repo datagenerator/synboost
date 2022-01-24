@@ -95,6 +95,7 @@ def evaluate_ensemble(weights_f):
         synthesis = data_i['synthesis'].cuda()
         label = data_i['label'].cuda()
 
+        trainer = DissimilarityTrainer(config=config, wandb=opts.wandb, resume=opts.wandb_resume)
         if prior:
             entropy = data_i['entropy'].cuda()
             mae = data_i['mae'].cuda()
