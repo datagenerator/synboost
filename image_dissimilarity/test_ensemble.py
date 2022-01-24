@@ -92,10 +92,13 @@ def evaluate_ensemble(weights_f):
                 entropy = data_i['entropy'].cuda()
                 mae = data_i['mae'].cuda()
                 distance = data_i['distance'].cuda()
-                outputs = softmax(diss_model(original, synthesis, semantic, entropy, mae, distance))
+                outputs = diss_model(original, synthesis, semantic, entropy, mae, distance)
+                print("inside check")
                 
             else:
                 outputs = softmax(diss_model(original, synthesis, semantic))
+                
+            outputs = softmax(outputs)
             (softmax_pred, predictions) = torch.max(outputs,dim=1)
             
             print(outputs.shape)
@@ -103,11 +106,10 @@ def evaluate_ensemble(weights_f):
             print(mae.shape)
             print(distance.shape)
             print(outputs[:,1,:,:].shape)
-            conv11 = nn.Conv2d(64, 2, kernel_size=1, padding=0)
-            outputs = conv11(outputs)
-            soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
-            flat_pred[i*w*h:i*w*h+w*h] = torch.flatten(soft_pred).detach().cpu().numpy()
-            flat_labels[i*w*h:i*w*h+w*h] = torch.flatten(label).detach().cpu().numpy()
+            #soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
+            soft_pred = outputs[:, 1, :, :]
+            flat_pred[i * w * h:i * w * h + w * h] = torch.flatten(soft_pred).detach().cpu().numpy()
+            flat_labels[i * w * h:i * w * h + w * h] = torch.flatten(label).detach().cpu().numpy()
             # Save results
             predicted_tensor = predictions * 1
             label_tensor = label * 1
