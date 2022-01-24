@@ -2,7 +2,6 @@ import argparse
 import yaml
 import torch.backends.cudnn as cudnn
 import torch
-import torch.nn as nn
 from PIL import Image
 import numpy as np
 import os
@@ -15,14 +14,6 @@ from numpy.linalg import norm
 from util.load import load_ckp
 from util import wandb_utils
 from util.load import load_ckp
-
-from trainers.dissimilarity_trainer import DissimilarityTrainer
-from util import trainer_util
-from util import trainer_util, metrics
-from util.iter_counter import IterationCounter
-from util.image_logging import ImgLogging
-from util import visualization
-from util import wandb_utils
 
 from util import trainer_util, metrics
 from util.iter_counter import IterationCounter
@@ -86,43 +77,48 @@ def evaluate_ensemble(weights_f):
     dataset = cfg_test_loader['dataset_args']
     h = int((dataset['crop_size']/dataset['aspect_ratio']))
     w = int(dataset['crop_size'])
-    flat_pred = np.zeros(w * h * len(test_loader))
-    flat_labels = np.zeros(w * h * len(test_loader))
-    val_loss = 0
-    for i, data_i in enumerate(tqdm(test_loader)):
-        original = data_i['original'].cuda()
-        semantic = data_i['semantic'].cuda()
-        synthesis = data_i['synthesis'].cuda()
-        label = data_i['label'].cuda()
-
-        trainer = DissimilarityTrainer(config=config, wandb=opts.wandb, resume=opts.wandb_resume)
-        if prior:
-            entropy = data_i['entropy'].cuda()
-            mae = data_i['mae'].cuda()
-            distance = data_i['distance'].cuda()
-
-            # Evaluating
-            loss, outputs = trainer.run_validation_prior(original, synthesis, semantic, label, entropy, mae,
-                                                         distance)
-        else:
-            loss, outputs = trainer.run_validation(original, synthesis, semantic, label)
-
-        val_loss += loss
-        outputs = softmax(outputs)
-        (softmax_pred, predictions) = torch.max(outputs, dim=1)
-        flat_pred[i * w * h:i * w * h + w * h] = torch.flatten(outputs[:, 1, :, :]).detach().cpu().numpy()
-        flat_labels[i * w * h:i * w * h + w * h] = torch.flatten(label).detach().cpu().numpy()
-
+    flat_pred = np.zeros(w*h*len(test_loader), dtype='float32')
+    flat_labels = np.zeros(w*h*len(test_loader), dtype='float32')
+    
+    with torch.no_grad():
+        for i, data_i in enumerate(test_loader):
+            original = data_i['original'].cuda()
+            semantic = data_i['semantic'].cuda()
+            synthesis = data_i['synthesis'].cuda()
+            label = data_i['label'].cuda()
+        
+            if prior:
+                entropy = data_i['entropy'].cuda()
+                mae = data_i['mae'].cuda()
+                distance = data_i['distance'].cuda()
+                outputs = softmax(diss_model(original, synthesis, semantic, entropy, mae, distance))
+                
+            else:
+                outputs = softmax(diss_model(original, synthesis, semantic))
+            (softmax_pred, predictions) = torch.max(outputs,dim=1)
+            
+            soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
+            flat_pred[i*w*h:i*w*h+w*h] = torch.flatten(soft_pred).detach().cpu().numpy()
+            flat_labels[i*w*h:i*w*h+w*h] = torch.flatten(label).detach().cpu().numpy()
+            # Save results
+            predicted_tensor = predictions * 1
+            label_tensor = label * 1
+            
+            file_name = os.path.basename(data_i['original_path'][0])
+            label_img = Image.fromarray(label_tensor.squeeze().cpu().numpy().astype(np.uint8))
+            soft_img = Image.fromarray((soft_pred.squeeze().cpu().numpy()*255).astype(np.uint8))
+            predicted_img = Image.fromarray(predicted_tensor.squeeze().cpu().numpy().astype(np.uint8))
+            predicted_img.save(os.path.join(store_fdr_exp, 'pred', file_name))
+            soft_img.save(os.path.join(store_fdr_exp, 'soft', file_name))
+            label_img.save(os.path.join(store_fdr_exp, 'label', file_name))
+    
     if config['test_dataloader']['dataset_args']['roi']:
         invalid_indices = np.argwhere(flat_labels == 255)
         flat_labels = np.delete(flat_labels, invalid_indices)
         flat_pred = np.delete(flat_pred, invalid_indices)
-
-    print('Calculating metrics')
+    
     results = metrics.get_metrics(flat_labels, flat_pred)
-    print('AU_ROC: %f' % results['auroc'])
-    print('mAP: %f' % results['AP'])
-    print('FPR@95TPR: %f' % results['FPR@95%TPR'])
+    return results['auroc'], results['AP'], results['FPR@95%TPR']
 
 if __name__ == '__main__':
     # Load experiment setting
@@ -163,12 +159,12 @@ if __name__ == '__main__':
     if 'vgg' in config['model']['architecture']:
         if config['model']['prior']:
             diss_model = DissimNetPrior(**config['model']).cuda()
-        else :
+        else:
             diss_model = DissimNet(**config['model']).cuda()
-    elif 'resnet' in config['model']['architecture']: 
+    elif 'resnet' in config['model']['architecture']:
         if config['model']['prior']:
             diss_model = ResNetDissimNetPrior(**config['model']).cuda()
-        else :
+        else:
             diss_model = ResNetDissimNet(**config['model']).cuda()
     else:
         raise NotImplementedError()
@@ -179,7 +175,7 @@ if __name__ == '__main__':
     diss_model.eval()
     if use_wandb and wandb_resume:
         checkpoint = load_ckp(config["wandb_config"]["model_path_base"], "best", opts.epoch)
-        diss_model.load_state_dict(checkpoint, strict=False)
+        diss_model.load_state_dict(checkpoint['state_dict'])
     
     softmax = torch.nn.Softmax(dim=1)
     best_weights, best_score, best_roc, best_ap = grid_search()
