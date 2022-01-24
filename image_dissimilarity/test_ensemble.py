@@ -86,10 +86,10 @@ def evaluate_ensemble(weights_f):
     dataset = cfg_test_loader['dataset_args']
     h = int((dataset['crop_size']/dataset['aspect_ratio']))
     w = int(dataset['crop_size'])
-    flat_pred = np.zeros(w * h * len(test_loader1))
-    flat_labels = np.zeros(w * h * len(test_loader1))
+    flat_pred = np.zeros(w * h * len(test_loader))
+    flat_labels = np.zeros(w * h * len(test_loader))
     val_loss = 0
-    for i, data_i in enumerate(tqdm(test_loader1)):
+    for i, data_i in enumerate(tqdm(test_loader)):
         original = data_i['original'].cuda()
         semantic = data_i['semantic'].cuda()
         synthesis = data_i['synthesis'].cuda()
