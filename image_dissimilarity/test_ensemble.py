@@ -156,10 +156,16 @@ if __name__ == '__main__':
     test_loader = trainer_util.get_dataloader(cfg_test_loader['dataset_args'], cfg_test_loader['dataloader_args'])
     
     # get model
-    if config['model']['prior']:
-        diss_model = DissimNetPrior(**config['model']).cuda()
-    elif 'vgg' in config['model']['architecture']:
-        diss_model = DissimNet(**config['model']).cuda()
+    if 'vgg' in config['model']['architecture']:
+        if config['model']['prior']:
+            diss_model = DissimNetPrior(**config['model']).cuda()
+        else :
+            diss_model = DissimNet(**config['model']).cuda()
+    elif 'resnet' in config['model']['architecture']: 
+        if config['model']['prior']:
+            diss_model = ResNetDissimNetPrior(**config['model']).cuda()
+        else :
+            diss_model = ResNetDissimNet(**config['model']).cuda()
     else:
         raise NotImplementedError()
     
