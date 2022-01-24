@@ -97,6 +97,8 @@ def evaluate_ensemble(weights_f):
                 outputs = softmax(diss_model(original, synthesis, semantic))
             (softmax_pred, predictions) = torch.max(outputs,dim=1)
             
+            self.conv11 = nn.Conv2d(64, 2, kernel_size=1, padding=0)
+            outputs = self.conv11(outputs)
             soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
             flat_pred[i*w*h:i*w*h+w*h] = torch.flatten(soft_pred).detach().cpu().numpy()
             flat_labels[i*w*h:i*w*h+w*h] = torch.flatten(label).detach().cpu().numpy()
