@@ -33,7 +33,7 @@ class DissimilarityTrainer:
         
         if 'vgg' in config['model']['architecture'] and config['model']['prior']:
             self.diss_model = DissimNetPrior(**config['model']).cuda(self.gpu)
-        elif 'resnet18' in config['model']['architecture'] and config['model']['prior']:
+        elif 'resnet101' in config['model']['architecture'] and config['model']['prior']:
             self.diss_model = ResNetDissimNetPrior(**config['model']).cuda(self.gpu)
         elif 'vgg' in config['model']['architecture']:
             self.diss_model = DissimNet(**config['model']).cuda(self.gpu)
