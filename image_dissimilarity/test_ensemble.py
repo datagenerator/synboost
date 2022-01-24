@@ -98,6 +98,11 @@ def evaluate_ensemble(weights_f):
                 outputs = softmax(diss_model(original, synthesis, semantic))
             (softmax_pred, predictions) = torch.max(outputs,dim=1)
             
+            print(output.shape)
+            print(entropy.shape)
+            print(mae.shape)
+            print(distance.shape)
+            print(output[:,1,:,:].shape)
             conv11 = nn.Conv2d(64, 2, kernel_size=1, padding=0)
             outputs = conv11(outputs)
             soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
