@@ -16,6 +16,14 @@ from util.load import load_ckp
 from util import wandb_utils
 from util.load import load_ckp
 
+from trainers.dissimilarity_trainer import DissimilarityTrainer
+from util import trainer_util
+from util import trainer_util, metrics
+from util.iter_counter import IterationCounter
+from util.image_logging import ImgLogging
+from util import visualization
+from util import wandb_utils
+
 from util import trainer_util, metrics
 from util.iter_counter import IterationCounter
 from models.dissimilarity_model import DissimNet, DissimNetPrior, ResNetDissimNet, ResNetDissimNetPrior
@@ -78,56 +86,42 @@ def evaluate_ensemble(weights_f):
     dataset = cfg_test_loader['dataset_args']
     h = int((dataset['crop_size']/dataset['aspect_ratio']))
     w = int(dataset['crop_size'])
-    flat_pred = np.zeros(w*h*len(test_loader))
-    flat_labels = np.zeros(w*h*len(test_loader))
-    
-    with torch.no_grad():
-        for i, data_i in enumerate(test_loader):
-            original = data_i['original'].cuda()
-            semantic = data_i['semantic'].cuda()
-            synthesis = data_i['synthesis'].cuda()
-            label = data_i['label'].cuda()
-        
-            if prior:
-                entropy = data_i['entropy'].cuda()
-                mae = data_i['mae'].cuda()
-                distance = data_i['distance'].cuda()
-                outputs = diss_model(original, synthesis, semantic, entropy, mae, distance)
-                print("inside check")
-                
-            else:
-                outputs = softmax(diss_model(original, synthesis, semantic))
-                
-            
-            print(outputs.shape)
-            print(entropy.shape)
-            print(mae.shape)
-            print(distance.shape)
-            print(outputs[:,1,:,:].shape)
-            #soft_pred = outputs[:,1,:,:]*weights_f[0] + entropy*weights_f[1] + mae*weights_f[2] + distance*weights_f[3]
-            outputs = softmax(outputs)
-            (softmax_pred, predictions) = torch.max(outputs, dim=1)
-            flat_pred[i * w * h:i * w * h + w * h] = torch.flatten(outputs[:, 1, :, :]).detach().cpu().numpy()
-            flat_labels[i * w * h:i * w * h + w * h] = torch.flatten(label).detach().cpu().numpy()
-            # Save results
-            predicted_tensor = predictions * 1
-            label_tensor = label * 1
-            soft_pred = outputs[:, 1, :, :]
-            file_name = os.path.basename(data_i['original_path'][0])
-            label_img = Image.fromarray(label_tensor.squeeze().cpu().numpy().astype(np.uint8))
-            soft_img = Image.fromarray((soft_pred.squeeze().cpu().numpy()*255).astype(np.uint8))
-            predicted_img = Image.fromarray(predicted_tensor.squeeze().cpu().numpy().astype(np.uint8))
-            predicted_img.save(os.path.join(store_fdr_exp, 'pred', file_name))
-            soft_img.save(os.path.join(store_fdr_exp, 'soft', file_name))
-            label_img.save(os.path.join(store_fdr_exp, 'label', file_name))
-    
+    flat_pred = np.zeros(w * h * len(test_loader1))
+    flat_labels = np.zeros(w * h * len(test_loader1))
+    val_loss = 0
+    for i, data_i in enumerate(tqdm(test_loader1)):
+        original = data_i['original'].cuda()
+        semantic = data_i['semantic'].cuda()
+        synthesis = data_i['synthesis'].cuda()
+        label = data_i['label'].cuda()
+
+        if prior:
+            entropy = data_i['entropy'].cuda()
+            mae = data_i['mae'].cuda()
+            distance = data_i['distance'].cuda()
+
+            # Evaluating
+            loss, outputs = trainer.run_validation_prior(original, synthesis, semantic, label, entropy, mae,
+                                                         distance)
+        else:
+            loss, outputs = trainer.run_validation(original, synthesis, semantic, label)
+
+        val_loss += loss
+        outputs = softmax(outputs)
+        (softmax_pred, predictions) = torch.max(outputs, dim=1)
+        flat_pred[i * w * h:i * w * h + w * h] = torch.flatten(outputs[:, 1, :, :]).detach().cpu().numpy()
+        flat_labels[i * w * h:i * w * h + w * h] = torch.flatten(label).detach().cpu().numpy()
+
     if config['test_dataloader']['dataset_args']['roi']:
         invalid_indices = np.argwhere(flat_labels == 255)
         flat_labels = np.delete(flat_labels, invalid_indices)
         flat_pred = np.delete(flat_pred, invalid_indices)
-    
+
+    print('Calculating metrics')
     results = metrics.get_metrics(flat_labels, flat_pred)
-    return results['auroc'], results['AP'], results['FPR@95%TPR']
+    print('AU_ROC: %f' % results['auroc'])
+    print('mAP: %f' % results['AP'])
+    print('FPR@95TPR: %f' % results['FPR@95%TPR'])
 
 if __name__ == '__main__':
     # Load experiment setting
