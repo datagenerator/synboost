@@ -112,7 +112,7 @@ def evaluate_ensemble(weights_f):
             # Save results
             predicted_tensor = predictions * 1
             label_tensor = label * 1
-            
+            soft_pred = outputs[:, 1, :, :]
             file_name = os.path.basename(data_i['original_path'][0])
             label_img = Image.fromarray(label_tensor.squeeze().cpu().numpy().astype(np.uint8))
             soft_img = Image.fromarray((soft_pred.squeeze().cpu().numpy()*255).astype(np.uint8))
