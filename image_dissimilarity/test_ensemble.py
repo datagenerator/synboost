@@ -2,6 +2,7 @@ import argparse
 import yaml
 import torch.backends.cudnn as cudnn
 import torch
+import torch.nn as nn
 from PIL import Image
 import numpy as np
 import os
