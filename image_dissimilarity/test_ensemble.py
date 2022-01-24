@@ -78,8 +78,8 @@ def evaluate_ensemble(weights_f):
     dataset = cfg_test_loader['dataset_args']
     h = int((dataset['crop_size']/dataset['aspect_ratio']))
     w = int(dataset['crop_size'])
-    flat_pred = np.zeros(w*h*len(test_loader), dtype='float32')
-    flat_labels = np.zeros(w*h*len(test_loader), dtype='float32')
+    flat_pred = np.zeros(w*h*len(test_loader))
+    flat_labels = np.zeros(w*h*len(test_loader))
     
     with torch.no_grad():
         for i, data_i in enumerate(test_loader):
